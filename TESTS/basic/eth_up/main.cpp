@@ -20,16 +20,8 @@
 #include "mbed.h"
 #include "greentea-client/test_env.h"
 
-#if MBED_CONF_TARGET_NETWORK_DEFAULT_INTERFACE_TYPE == ETHERNET
-  #define TEST_NETWORK_TYPE "Ethernet"
-#elif MBED_CONF_TARGET_NETWORK_DEFAULT_INTERFACE_TYPE == WIFI
-  #define TEST_NETWORK_TYPE "WiFi"
-#elif MBED_CONF_TARGET_NETWORK_DEFAULT_INTERFACE_TYPE == MESH
-  #define TEST_NETWORK_TYPE "Mesh"
-#elif MBED_CONF_TARGET_NETWORK_DEFAULT_INTERFACE_TYPE == CELLULAR
-  #define TEST_NETWORK_TYPE "Cellular"
-#else
-  #error [NOT_SUPPORTED] Either WiFi, Ethernet or Cellular network interface need to be enabled
+#ifndef TESTCASE_COUNT
+#define TESTCASE_COUNT 100
 #endif
 
 #if !defined(MBED_CONF_APP_NO_LED)
@@ -81,7 +73,6 @@ void eth_up_testsuite(void) {
     greentea_send_kv("device_ready", true);
     while (1) {
         greentea_parse_kv(_key, _value, sizeof(_key), sizeof(_value));
-
         if (strcmp(_key, "iteration") == 0) {
             iteration = atoi(_value);
             break;
@@ -90,8 +81,8 @@ void eth_up_testsuite(void) {
 
     // provide manifest to greentea so it can correct show skipped and failed tests
     if (iteration == 0) {
-        greentea_send_kv(GREENTEA_TEST_ENV_TESTCASE_COUNT, 10);
-        for (int i=0; i<10; i++){
+        greentea_send_kv(GREENTEA_TEST_ENV_TESTCASE_COUNT, TESTCASE_COUNT);
+        for (int i=0; i<TESTCASE_COUNT; i++){
             sprintf(snum, "Connect %3d", i);
             greentea_send_kv(GREENTEA_TEST_ENV_TESTCASE_NAME, snum);
         }
@@ -110,7 +101,7 @@ void eth_up_testsuite(void) {
     // Report status to console.
     if (net_status != 0) {
         logger("[ERROR] Device failed to connect to Network.\r\n");
-        test_failed();
+        //test_failed(); --> even if one test fails, continue to next one
     } else {
         logger("[INFO] Connected to network successfully. IP address: %s\n", net->get_ip_address());
     }
@@ -118,14 +109,13 @@ void eth_up_testsuite(void) {
     sprintf(snum, "Connect %3d", iteration);
     test_case_finish(snum, (net_status == 0), (net_status != 0));
 
-    if (iteration < 10) {
+    if (iteration < TESTCASE_COUNT) {
         logger("[INFO] Resetting device.\r\n");
         greentea_send_kv("test_advance", 0);
         while (1) {
             greentea_parse_kv(_key, _value, sizeof(_key), sizeof(_value));
-
             if (strcmp(_key, "reset") == 0) {
-                wait(1);
+                wait(0.1);
                 system_reset();
                 break;
             }
@@ -148,7 +138,7 @@ int main(void) {
 
     greentea_send_kv("device_booted", 1);
 
-    GREENTEA_SETUP(240, "eth_host_tests");
+    GREENTEA_SETUP(TESTCASE_COUNT*6, "eth_host_tests");
     eth_up_testsuite();
 
     return 0;
